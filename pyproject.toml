@@ -24,3 +24,12 @@ version = {attr = "bctui.__version__"}
 
 [tool.basedpyright]
 typeCheckingMode = "standard"
+
+[tool.ruff]
+line-length = 88
+indent-width = 4
+
+[too.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false

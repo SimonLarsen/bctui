@@ -1,0 +1,26 @@
+[project]
+name = "bctui"
+dynamic = ["version"]
+dependencies = [
+    "textual>=8.2.7",
+    "requests>=2.34.2",
+    "beautifulsoup4>=4.15.0",
+]
+requires-python = ">=3.10"
+authors = [
+    {name = "Simon J. Larsen", email = "simonhffh@gmail.com"},
+]
+maintainers = [
+    {name = "Simon J. Larsen", email = "simonhffh@gmail.com"},
+]
+readme = {file = "README.md", content-type = "text/markdown"}
+license = "MIT"
+
+[build-system]
+requires = ["setuptools>=82.0.1"]
+
+[tool.setuptools.dynamic]
+version = {attr = "bctui.__version__"}
+
+[tool.basedpyright]
+typeCheckingMode = "standard"

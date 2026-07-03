@@ -7,6 +7,7 @@ from bs4 import BeautifulSoup
 
 @dataclass
 class CollectionEntry:
+    uid: int
     artist: str
     title: str
     url: str
@@ -14,10 +15,12 @@ class CollectionEntry:
 
 @dataclass
 class TrackData:
+    uid: int
     artist: str | None
     title: str
     url: str
     duration: float
+
 
 @dataclass
 class AlbumData:
@@ -46,7 +49,7 @@ def fetch_collection(
     if res.status_code != 200:
         raise RuntimeError("Could not fetch collection page.")
 
-    soup = BeautifulSoup(res.content)
+    soup = BeautifulSoup(res.content, "html.parser")
     data_div = soup.find("div", attrs={"id": "pagedata"})
     if data_div is None:
         raise RuntimeError("Collection page did not contains page data element.")
@@ -60,6 +63,7 @@ def fetch_collection(
     collection = []
     for _, item in data["item_cache"]["collection"].items():
         entry = CollectionEntry(
+            uid=item["item_id"],
             artist=item["band_name"],
             title=item["item_title"],
             url=item["item_url"],
@@ -69,7 +73,6 @@ def fetch_collection(
     # Fetch remaining collection page iteratively
     # using API
     fan_id = int(data["fan_data"]["fan_id"])
-    item_count = int(data["collection_data"]["item_count"])
     last_token = data["collection_data"]["last_token"]
 
     while True:
@@ -79,7 +82,7 @@ def fetch_collection(
                 count=items_per_query,
                 fan_id=fan_id,
                 older_than_token=last_token,
-            )
+            ),
         )
         if res.status_code != 200:
             raise RuntimeError("Error fetching collection from API.")
@@ -87,6 +90,7 @@ def fetch_collection(
         data = res.json()
         for item in data["items"]:
             entry = CollectionEntry(
+                uid=item["item_id"],
                 artist=item["band_name"],
                 title=item["item_title"],
                 url=item["item_url"],
@@ -130,6 +134,7 @@ def fetch_album(album_url: str) -> AlbumData:
     tracks = []
     for item in data["trackinfo"]:
         track = TrackData(
+            uid=item["track_id"],
             artist=str(item["artist"]) if item["artist"] is not None else None,
             title=item["title"],
             url=str(item["file"]["mp3-128"]),
@@ -138,4 +143,3 @@ def fetch_album(album_url: str) -> AlbumData:
         tracks.append(track)
 
     return AlbumData(tracks=tracks)
-

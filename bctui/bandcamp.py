@@ -1,7 +1,6 @@
-from collections.abc import Sequence
 from dataclasses import dataclass
 import json
-import requests
+import httpx
 from bs4 import BeautifulSoup
 
 
@@ -18,17 +17,12 @@ class TrackData:
     uid: int
     artist: str | None
     title: str
-    url: str
+    url: str | None
     duration: float
 
 
-@dataclass
-class AlbumData:
-    tracks: Sequence[TrackData]
-
-
 def fetch_collection(
-    collection_url: str,
+    username: str,
     items_per_query: int = 20,
 ) -> list[CollectionEntry]:
     """
@@ -36,59 +30,35 @@ def fetch_collection(
 
     Parameters
     ----------
-    collection_url : str
-        Fan page url e.g. 'https://bandcamp.com/simonlarsen'.
+
+    username : str
+        Fan account username.
 
     Returns
     -------
     list[CollectionEntry]
         List of albums/tracks in collection.
     """
-    res = requests.get(collection_url)
-
-    if res.status_code != 200:
-        raise RuntimeError("Could not fetch collection page.")
-
-    soup = BeautifulSoup(res.content, "html.parser")
-    data_div = soup.find("div", attrs={"id": "pagedata"})
-    if data_div is None:
-        raise RuntimeError("Collection page did not contains page data element.")
-
-    if "data-blob" not in data_div.attrs:
-        raise RuntimeError("pagedata element has not attribute 'data-blob'.")
-
-    data = json.loads(str(data_div.attrs["data-blob"]))
-
-    # Parse initial collection items
     collection = []
-    for _, item in data["item_cache"]["collection"].items():
-        entry = CollectionEntry(
-            uid=item["item_id"],
-            artist=item["band_name"],
-            title=item["item_title"],
-            url=item["item_url"],
-        )
-        collection.append(entry)
 
-    # Fetch remaining collection page iteratively
-    # using API
-    fan_id = int(data["fan_data"]["fan_id"])
-    last_token = data["collection_data"]["last_token"]
+    with httpx.Client() as client:
+        res = client.get(f"https://bandcamp.com/{username}")
 
-    while True:
-        res = requests.post(
-            url="https://bandcamp.com/api/fancollection/1/collection_items",
-            json=dict(
-                count=items_per_query,
-                fan_id=fan_id,
-                older_than_token=last_token,
-            ),
-        )
         if res.status_code != 200:
-            raise RuntimeError("Error fetching collection from API.")
+            raise RuntimeError("Could not fetch collection page.")
 
-        data = res.json()
-        for item in data["items"]:
+        soup = BeautifulSoup(res.content, "html.parser")
+        data_div = soup.find("div", attrs={"id": "pagedata"})
+        if data_div is None:
+            raise RuntimeError("Collection page did not contains page data element.")
+
+        if "data-blob" not in data_div.attrs:
+            raise RuntimeError("pagedata element has not attribute 'data-blob'.")
+
+        data = json.loads(str(data_div.attrs["data-blob"]))
+
+        # Parse initial collection items
+        for _, item in data["item_cache"]["collection"].items():
             entry = CollectionEntry(
                 uid=item["item_id"],
                 artist=item["band_name"],
@@ -97,14 +67,41 @@ def fetch_collection(
             )
             collection.append(entry)
 
-        if not data["more_available"]:
-            break
-        last_token = data["last_token"]
+        # Fetch remaining collection page iteratively
+        # using API
+        fan_id = int(data["fan_data"]["fan_id"])
+        last_token = data["collection_data"]["last_token"]
+
+        while True:
+            res = client.post(
+                url="https://bandcamp.com/api/fancollection/1/collection_items",
+                json=dict(
+                    count=items_per_query,
+                    fan_id=fan_id,
+                    older_than_token=last_token,
+                ),
+            )
+            if res.status_code != 200:
+                raise RuntimeError("Error fetching collection from API.")
+
+            data = res.json()
+            for item in data["items"]:
+                entry = CollectionEntry(
+                    uid=item["item_id"],
+                    artist=item["band_name"],
+                    title=item["item_title"],
+                    url=item["item_url"],
+                )
+                collection.append(entry)
+
+            if not data["more_available"]:
+                break
+            last_token = data["last_token"]
 
     return collection
 
 
-def fetch_album(album_url: str) -> AlbumData:
+async def fetch_album(album_url: str) -> list[TrackData]:
     """
     Fetch album data from album page.
 
@@ -115,14 +112,16 @@ def fetch_album(album_url: str) -> AlbumData:
 
     Returns
     -------
-    AlbumData
-        Album data.
+    list of TrackData
+        Retrieved data for all album tracks.
     """
-    res = requests.get(album_url)
+    async with httpx.AsyncClient() as client:
+        res = await client.get(album_url)
+
     if res.status_code != 200:
         raise RuntimeError("Could not fetch album page.")
 
-    soup = BeautifulSoup(res.content)
+    soup = BeautifulSoup(res.content, "html.parser")
     data = None
     for script in soup.find_all("script"):
         if "data-tralbum" in script.attrs:
@@ -133,13 +132,18 @@ def fetch_album(album_url: str) -> AlbumData:
 
     tracks = []
     for item in data["trackinfo"]:
+        url = None
+
+        if item.get("file") is not None and "mp3-128" in item["file"]:
+            url = str(item["file"]["mp3-128"])
+
         track = TrackData(
             uid=item["track_id"],
             artist=str(item["artist"]) if item["artist"] is not None else None,
             title=item["title"],
-            url=str(item["file"]["mp3-128"]),
+            url=url,
             duration=float(item["duration"]),
         )
         tracks.append(track)
 
-    return AlbumData(tracks=tracks)
+    return tracks

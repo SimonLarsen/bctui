@@ -1,0 +1,25 @@
+.column {
+    border: round white;
+    border-title-align: left;
+}
+
+AlbumList {
+    width: 0.33fr;
+}
+
+TrackList {
+    width: 0.67fr;
+}
+
+Rule {
+    margin: 0;
+}
+
+.option-list--option {
+    color: $foreground;
+    background: $background;
+}
+
+Bar {
+    width: 1fr;
+}

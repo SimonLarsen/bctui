@@ -1,6 +1,13 @@
-.column {
-    border: round white;
-    border-title-align: left;
+AlbumList, TrackList {
+    height: 1fr;
+    border: round $foreground;
+    background: $background;
+    background-tint: $background;
+    scrollbar-size: 1 1;
+
+    &:focus {
+        border: round $primary;
+    }
 }
 
 AlbumList {
@@ -11,15 +18,10 @@ TrackList {
     width: 0.67fr;
 }
 
-Rule {
-    margin: 0;
-}
-
-.option-list--option {
-    color: $foreground;
-    background: $background;
-}
-
 Bar {
-    width: 1fr;
+    width: 1.0fr;
+}
+
+Footer {
+    background: $background;
 }

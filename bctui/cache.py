@@ -2,7 +2,7 @@ from collections.abc import Sequence
 from pathlib import Path
 import xdg.BaseDirectory
 import sqlite3
-from bctui.bandcamp import CollectionEntry
+from bctui.types import CollectionEntry
 
 
 def save_collection(collection: Sequence[CollectionEntry]) -> None:
@@ -12,10 +12,10 @@ def save_collection(collection: Sequence[CollectionEntry]) -> None:
     try:
         cur = con.cursor()
         cur.execute("DROP TABLE IF EXISTS collection")
-        cur.execute("CREATE TABLE collection(uid, artist, title, url)")
+        cur.execute("CREATE TABLE collection(uid, artist, title, year, genre)")
 
         cur.executemany(
-            "INSERT INTO collection VALUES (:uid, :artist, :title, :url)",
+            "INSERT INTO collection VALUES (:uid, :artist, :title, :year, :genre)",
             [e.__dict__ for e in collection],
         )
     finally:

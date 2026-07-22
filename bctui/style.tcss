@@ -25,3 +25,13 @@ Bar {
 Footer {
     background: $background;
 }
+
+UpdateCollectionModal {
+    align: center middle;
+
+    Label {
+        border: round $foreground;
+        padding: 0 1;
+        content-align: center middle;
+    }
+}

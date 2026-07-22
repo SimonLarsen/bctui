@@ -7,10 +7,13 @@ from textual.reactive import reactive
 from textual.message import Message
 from textual.containers import Horizontal
 from textual.binding import Binding
-from textual.widgets import OptionList, Footer, ProgressBar
+from textual.widgets import OptionList, Footer, ProgressBar, Label
+from textual.screen import ModalScreen
 import mpv
-from bctui.bandcamp import fetch_album, CollectionEntry, TrackData
-from bctui.cache import load_collection
+from bctui.config import Config
+from bctui.types import CollectionEntry, TrackData
+from bctui.subsonic import SubsonicClient
+from bctui.cache import load_collection, save_collection
 
 
 def _duration_to_hhmmss(duration: float) -> str:
@@ -35,9 +38,9 @@ class AlbumList(JKOptionList):
 
     @dataclass
     class AlbumSelected(Message):
+        uid: str
         artist: str
         album: str
-        album_url: str
 
     def __init__(self):
         super().__init__()
@@ -59,11 +62,10 @@ class AlbumList(JKOptionList):
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
         index = event.option_index
         album = self.collection[index]
-        self.post_message(self.AlbumSelected(album.artist, album.title, album.url))
+        self.post_message(self.AlbumSelected(album.uid, album.artist, album.title))
 
 
 class TrackList(JKOptionList):
-    album_url: reactive[str] = reactive("")
     tracks: reactive[list[TrackData]] = reactive([])
 
     @dataclass
@@ -98,18 +100,13 @@ class TrackList(JKOptionList):
             self.add_option(row)
         self.highlighted = 0
 
-    @work(exclusive=True)
-    async def fetch_track_list(self, album_url: str) -> None:
-        self.tracks = await fetch_album(album_url)
-
-    async def watch_album_url(self, album_url: str) -> None:
-        if album_url == "":
-            return
-        self.tracks = []
-        self.fetch_track_list(album_url)
-
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
         self.post_message(self.TrackSelected(self.tracks, event.option_index))
+
+
+class UpdateCollectionModal(ModalScreen):
+    def compose(self) -> ComposeResult:
+        yield Label("Updating collection...")
 
 
 class BCTUIApp(App):
@@ -124,7 +121,17 @@ class BCTUIApp(App):
         Binding("p", "pause", "Pause"),
         Binding("h", "focus_collection", "Focus collection"),
         Binding("l", "focus_track_list", "Focus tracks"),
+        Binding("u", "update_collection", "Update collection"),
     ]
+
+    def __init__(self) -> None:
+        super().__init__()
+
+        self._config = Config.load()
+        self._api = SubsonicClient(
+            username=self._config.username, password=self._config.password
+        )
+        self._collection = load_collection()
 
     def compose(self) -> ComposeResult:
         with Horizontal():
@@ -135,10 +142,8 @@ class BCTUIApp(App):
         yield Footer(compact=True)
 
     def on_mount(self) -> None:
-        collection = load_collection()
-
         album_list = self.query_exactly_one(AlbumList)
-        album_list.collection = collection
+        album_list.collection = self._collection
 
         self.mpv = mpv.MPV(
             force_seekable=True,
@@ -150,16 +155,24 @@ class BCTUIApp(App):
     def on_unmount(self) -> None:
         self.mpv.terminate()
 
-    def on_album_list_album_selected(self, message: AlbumList.AlbumSelected) -> None:
+    @work(exclusive=True)
+    async def update_track_list(self, message: AlbumList.AlbumSelected) -> None:
+        album_data = await self._api.get_album(message.uid)
         track_list = self.query_exactly_one(TrackList)
         track_list.border_title = f"{message.artist} - {message.album}"
-        track_list.album_url = message.album_url
+        track_list.tracks = list(album_data.songs)
+
+    async def on_album_list_album_selected(
+        self, message: AlbumList.AlbumSelected
+    ) -> None:
+        self.update_track_list(message)
 
     def on_track_list_track_selected(self, message: TrackList.TrackSelected) -> None:
         self.mpv.stop(keep_playlist=False)
         self.mpv.playlist_clear()
         for track in message.tracks:
-            self.mpv.playlist_append(track.url)
+            url = self._api.get_stream_url(track.uid)
+            self.mpv.playlist_append(str(url))
         self.mpv.playlist_pos = message.index
 
     def action_prev(self) -> None:
@@ -194,6 +207,17 @@ class BCTUIApp(App):
         if percent_pos is None or not isinstance(percent_pos, float):
             return
         self.query_exactly_one(ProgressBar).update(progress=percent_pos / 100.0)
+
+    async def action_update_collection(self) -> None:
+        self.push_screen(UpdateCollectionModal())
+
+        self._collection = await self._api.get_collection()
+        save_collection(self._collection)
+
+        self.pop_screen()
+
+        album_list = self.query_exactly_one(AlbumList)
+        album_list.collection = self._collection
 
 
 if __name__ == "__main__":

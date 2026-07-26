@@ -1,29 +1,19 @@
+from typing import Iterable
 from dataclasses import dataclass
-import math
-from rich.table import Table
-from textual.app import App, ComposeResult
+from textual.app import App, ComposeResult, SystemCommand
 from textual import work
 from textual.reactive import reactive
 from textual.message import Message
 from textual.containers import Horizontal
 from textual.binding import Binding
 from textual.widgets import OptionList, Footer, ProgressBar, Label
-from textual.screen import ModalScreen
+from textual.screen import Screen, ModalScreen
 import mpv
 from bctui.config import Config
 from bctui.types import CollectionEntry, TrackData
 from bctui.subsonic import SubsonicClient
 from bctui.cache import load_collection, save_collection
-
-
-def _duration_to_hhmmss(duration: float) -> str:
-    hours = int(duration // 3600)
-    minutes = int((duration % 3600) // 60)
-    seconds = int(duration % 60)
-    if hours > 0:
-        return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
-    else:
-        return f"{minutes:02d}:{seconds:02d}"
+from bctui.renderables import AlbumRow, TrackRow
 
 
 class JKOptionList(OptionList):
@@ -50,11 +40,7 @@ class AlbumList(JKOptionList):
         self.clear_options()
 
         for elem in collection:
-            row = Table.grid(expand=True, padding=(0, 1, 0, 1))
-            row.add_column(ratio=2, no_wrap=True)
-            row.add_column(ratio=3, no_wrap=True)
-            row.add_row(elem.artist, elem.title)
-            self.add_option(row)
+            self.add_option(AlbumRow(elem.artist, elem.title))
 
         self.highlighted = 0
         self.focus()
@@ -83,21 +69,8 @@ class TrackList(JKOptionList):
         if len(tracks) == 0:
             return
 
-        no_width = max(math.ceil(math.log10(len(tracks))) + 1, 2)
-        max_duration = max([t.duration for t in tracks])
-        duration_width = 8 if max_duration >= 3600 else 5
-
         for i, track in enumerate(tracks):
-            row = Table.grid(expand=True, padding=(0, 1, 0, 1))
-            row.add_column(width=no_width, justify="right")
-            row.add_column(ratio=1, no_wrap=True)
-            row.add_column(width=duration_width, justify="right")
-            row.add_row(
-                f"{i + 1}.",
-                track.title,
-                _duration_to_hhmmss(track.duration),
-            )
-            self.add_option(row)
+            self.add_option(TrackRow(i, len(tracks), track.title, track.duration))
         self.highlighted = 0
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
@@ -121,7 +94,7 @@ class BCTUIApp(App):
         Binding("p", "pause", "Pause"),
         Binding("h", "focus_collection", "Focus collection"),
         Binding("l", "focus_track_list", "Focus tracks"),
-        Binding("u", "update_collection", "Update collection"),
+        Binding("U", "update_collection", "Update collection"),
     ]
 
     def __init__(self) -> None:
@@ -132,6 +105,16 @@ class BCTUIApp(App):
             username=self._config.username, password=self._config.password
         )
         self._collection = load_collection()
+        self._mpv = mpv.MPV(
+            force_seekable=True,
+            prefetch_playlist=True,
+        )
+
+    def get_system_commands(self, screen: Screen) -> Iterable[SystemCommand]:
+        yield from super().get_system_commands(screen)
+        yield SystemCommand(
+            "Update collection", "Update collection", self.action_update_collection
+        )
 
     def compose(self) -> ComposeResult:
         with Horizontal():
@@ -144,16 +127,10 @@ class BCTUIApp(App):
     def on_mount(self) -> None:
         album_list = self.query_exactly_one(AlbumList)
         album_list.collection = self._collection
-
-        self.mpv = mpv.MPV(
-            force_seekable=True,
-            prefetch_playlist=True,
-        )
-
         self.progress_timer = self.set_interval(1.0, self.update_progress)
 
     def on_unmount(self) -> None:
-        self.mpv.terminate()
+        self._mpv.terminate()
 
     @work(exclusive=True)
     async def update_track_list(self, message: AlbumList.AlbumSelected) -> None:
@@ -168,27 +145,33 @@ class BCTUIApp(App):
         self.update_track_list(message)
 
     def on_track_list_track_selected(self, message: TrackList.TrackSelected) -> None:
-        self.mpv.stop(keep_playlist=False)
-        self.mpv.playlist_clear()
+        self._mpv.stop(keep_playlist=False)
+        self._mpv.playlist_clear()
         for track in message.tracks:
             url = self._api.get_stream_url(track.uid)
-            self.mpv.playlist_append(str(url))
-        self.mpv.playlist_pos = message.index
+            self._mpv.playlist_append(str(url))
+        self._mpv.playlist_pos = message.index
+
+    def _set_playlist_pos(self, index: int) -> None:
+        n = len(self._mpv.playlist_filenames)
+        if n == 0:
+            return
+        self._mpv.playlist_pos = min(max(index, 0), n - 1)
 
     def action_prev(self) -> None:
-        pos = self.mpv.playlist_pos
+        pos = self._mpv.playlist_pos
         if not isinstance(pos, int) or pos == -1:
             return
         self._set_playlist_pos(pos - 1)
 
     def action_next(self) -> None:
-        pos = self.mpv.playlist_pos
+        pos = self._mpv.playlist_pos
         if not isinstance(pos, int) or pos == -1:
             return
         self._set_playlist_pos(pos + 1)
 
     def action_pause(self) -> None:
-        self.mpv.pause = not self.mpv.pause
+        self._mpv.pause = not self._mpv.pause
 
     def action_focus_collection(self) -> None:
         self.query_exactly_one(AlbumList).focus()
@@ -196,14 +179,8 @@ class BCTUIApp(App):
     def action_focus_track_list(self) -> None:
         self.query_exactly_one(TrackList).focus()
 
-    def _set_playlist_pos(self, index: int) -> None:
-        n = len(self.mpv.playlist_filenames)
-        if n == 0:
-            return
-        self.mpv.playlist_pos = min(max(index, 0), n - 1)
-
     def update_progress(self) -> None:
-        percent_pos = self.mpv.percent_pos
+        percent_pos = self._mpv.percent_pos
         if percent_pos is None or not isinstance(percent_pos, float):
             return
         self.query_exactly_one(ProgressBar).update(progress=percent_pos / 100.0)

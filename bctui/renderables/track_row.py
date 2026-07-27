@@ -20,11 +20,13 @@ class TrackRow:
         num_tracks: int,
         title: str,
         duration: float,
+        playing: bool = False,
     ):
         self._track_no = track_no
         self._num_tracks = num_tracks
         self._title = title
         self._duration = duration
+        self._playing = playing
 
     def __rich_console__(
         self,
@@ -45,4 +47,7 @@ class TrackRow:
         t3 = Text(_duration_to_hhmmss(self._duration))
         t3.pad_left(duration_width - t3.cell_len)
 
-        yield Text(" ").join((t1, t2, t3))
+        out = Text(" ").join((t1, t2, t3))
+        if self._playing:
+            out.stylize("reverse")
+        yield out

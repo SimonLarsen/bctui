@@ -1,17 +1,19 @@
 from dataclasses import dataclass
-from textual.app import App, ComposeResult
-from textual.reactive import reactive
-from textual.message import Message
-from textual.containers import Horizontal
-from textual.binding import Binding
-from textual.widgets import OptionList, Footer, ProgressBar, Label
-from textual.screen import ModalScreen
+
 import mpv
-from bctui.config import Config
-from bctui.types import CollectionEntry, TrackData
-from bctui.subsonic import SubsonicClient
+from textual.app import App, ComposeResult
+from textual.binding import Binding
+from textual.containers import Horizontal
+from textual.message import Message
+from textual.reactive import reactive
+from textual.screen import ModalScreen
+from textual.widgets import Footer, Label, OptionList, ProgressBar
+
 from bctui.cache import load_collection, save_collection
+from bctui.config import Config
 from bctui.renderables import AlbumRow, TrackRow
+from bctui.subsonic import SubsonicClient
+from bctui.types import CollectionEntry, TrackData
 
 
 class JKOptionList(OptionList):
@@ -201,7 +203,7 @@ class BCTUIApp(App):
         for track in message.tracks:
             url = self._api.get_stream_url(track.uid)
             self._mpv.playlist_append(str(url))
-        self._mpv.playlist_pos = message.index
+        self._set_playlist_pos(message.index)
         self.playing_album_uid = message.album_uid
 
         album_list = self.query_exactly_one(AlbumList)
@@ -215,6 +217,7 @@ class BCTUIApp(App):
         if n == 0:
             return
         self._mpv.playlist_pos = min(max(index, 0), n - 1)
+        self._mpv.pause = False
 
     def action_prev(self) -> None:
         pos = self._mpv.playlist_pos
@@ -237,12 +240,6 @@ class BCTUIApp(App):
     def action_focus_track_list(self) -> None:
         self.query_exactly_one(TrackList).focus()
 
-    def update_progress(self) -> None:
-        percent_pos = self._mpv.percent_pos
-        if percent_pos is None or not isinstance(percent_pos, float):
-            return
-        self.query_exactly_one(ProgressBar).update(progress=percent_pos / 100.0)
-
     async def action_update_collection(self) -> None:
         self.push_screen(UpdateCollectionModal())
 
@@ -253,6 +250,12 @@ class BCTUIApp(App):
 
         album_list = self.query_exactly_one(AlbumList)
         album_list.collection = self._collection
+
+    def update_progress(self) -> None:
+        percent_pos = self._mpv.percent_pos
+        if percent_pos is None or not isinstance(percent_pos, float):
+            return
+        self.query_exactly_one(ProgressBar).update(progress=percent_pos / 100.0)
 
 
 if __name__ == "__main__":

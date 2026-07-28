@@ -1,9 +1,11 @@
-from typing import Any
-import string
-import random
 import hashlib
+import random
+import string
+from typing import Any
+
 import httpx
-from bctui.types import CollectionEntry, AlbumData, TrackData
+
+from bctui.types import AlbumData, CollectionEntry, TrackData
 
 
 class SubsonicConnectionError(Exception):
@@ -32,14 +34,14 @@ class SubsonicClient:
     def _get_base_params(self) -> dict[str, str]:
         salt = "".join(random.choices(string.ascii_letters + string.digits, k=12))
         token = hashlib.md5((self._password + salt).encode("utf-8")).hexdigest()
-        params = dict(
-            u=self._username,
-            s=salt,
-            t=token,
-            c=self._client_name,
-            v=self._version,
-            f="json",
-        )
+        params = {
+            "u": self._username,
+            "s": salt,
+            "t": token,
+            "c": self._client_name,
+            "v": self._version,
+            "f": "json",
+        }
         return params
 
     async def _get(
@@ -120,7 +122,7 @@ class SubsonicClient:
 
     def get_stream_url(self, uid: str) -> httpx.URL:
         params = self._get_base_params()
-        params.update(dict(id=uid, format="mp3"))
+        params.update({"id": uid, "format": "mp3"})
         url = self._url.copy_with(
             path=self._url.path + "/rest/stream",
             params=params,

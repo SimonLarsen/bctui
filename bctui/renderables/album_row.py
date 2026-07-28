@@ -20,7 +20,6 @@ class AlbumRow:
         console: Console,
         options: ConsoleOptions,
     ) -> RenderResult:
-        console.options.__eq__
         width = options.max_width
         w1 = round(self._ratio * width)
         w2 = width - w1 - 1

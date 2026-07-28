@@ -1,6 +1,7 @@
-from dataclasses import dataclass
-import xdg.BaseDirectory
 import json
+from dataclasses import dataclass
+
+import xdg.BaseDirectory
 
 
 class ConfigNotFoundError(Exception):

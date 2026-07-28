@@ -1,7 +1,9 @@
+import sqlite3
 from collections.abc import Sequence
 from pathlib import Path
+
 import xdg.BaseDirectory
-import sqlite3
+
 from bctui.types import CollectionEntry
 
 

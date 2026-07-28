@@ -1,4 +1,5 @@
 import math
+
 from rich.console import Console, ConsoleOptions, RenderResult
 from rich.text import Text
 

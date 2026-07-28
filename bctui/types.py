@@ -16,6 +16,7 @@ class TrackData:
     uid: str
     artist: str
     title: str
+    album: str
     duration: int
     genre: str | None
 

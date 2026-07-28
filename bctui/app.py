@@ -3,14 +3,15 @@ from dataclasses import dataclass
 import mpv
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal
+from textual.containers import Grid, Horizontal
 from textual.message import Message
 from textual.reactive import reactive
 from textual.screen import ModalScreen
-from textual.widgets import Footer, Label, OptionList, ProgressBar
+from textual.widgets import Footer, Label, OptionList, ProgressBar, Static
 
 from bctui.cache import load_collection, save_collection
 from bctui.config import Config
+from bctui.format import duration_to_hhmmss
 from bctui.renderables import AlbumRow, TrackRow
 from bctui.subsonic import SubsonicClient
 from bctui.types import CollectionEntry, TrackData
@@ -111,6 +112,24 @@ class UpdateCollectionModal(ModalScreen):
         yield Label("Updating collection...")
 
 
+class StatusBar(Grid):
+    title: reactive[str] = reactive("N/A", recompose=True)
+    artist: reactive[str] = reactive("N/A", recompose=True)
+    album: reactive[str] = reactive("N/A", recompose=True)
+    position: reactive[float] = reactive(0.0, recompose=True)
+    duration: reactive[float] = reactive(0.0, recompose=True)
+
+    def compose(self) -> ComposeResult:
+        yield Static(self.title, classes="statusbar--title")
+        yield Static(" by ", classes="statusbar--separator")
+        yield Static(self.artist, classes="statusbar--artist")
+        yield Static(" from ", classes="statusbar--separator")
+        yield Static(self.album, classes="statusbar--album")
+        t1 = duration_to_hhmmss(self.position)
+        t2 = duration_to_hhmmss(self.duration)
+        yield Static(f"[{t1}/{t2}]", classes="statusbar--time")
+
+
 class BCTUIApp(App):
     CSS_PATH = "style.tcss"
 
@@ -151,8 +170,12 @@ class BCTUIApp(App):
         with Horizontal():
             yield AlbumList()
             yield TrackList()
-
-        yield ProgressBar(total=1.0, show_percentage=True, show_eta=False)
+        yield StatusBar()
+        yield ProgressBar(
+            total=1.0,
+            show_percentage=False,
+            show_eta=False,
+        )
         yield Footer(compact=True)
 
     def on_mount(self) -> None:
@@ -167,8 +190,16 @@ class BCTUIApp(App):
         pos = self._mpv.playlist_pos
         if not isinstance(pos, int) or pos < 0:
             return
+
+        track = self._playlist[pos]
+
         track_list = self.query_exactly_one(TrackList)
-        track_list.playing_uid = self._playlist[pos].uid
+        track_list.playing_uid = track.uid
+
+        status_bar = self.query_exactly_one(StatusBar)
+        status_bar.artist = track.artist
+        status_bar.title = track.title
+        status_bar.album = track.album
 
     async def _update_track_list(self, message: AlbumList.AlbumSelected) -> None:
         album_data = await self._api.get_album(message.album.uid)
@@ -238,9 +269,18 @@ class BCTUIApp(App):
 
     def update_progress(self) -> None:
         percent_pos = self._mpv.percent_pos
-        if percent_pos is None or not isinstance(percent_pos, float):
-            return
-        self.query_exactly_one(ProgressBar).update(progress=percent_pos / 100.0)
+        if isinstance(percent_pos, float):
+            progress_bar = self.query_exactly_one(ProgressBar)
+            progress_bar.update(progress=percent_pos / 100)
+
+        status_bar = self.query_exactly_one(StatusBar)
+        time_pos = self._mpv.time_pos
+        if isinstance(time_pos, float):
+            status_bar.position = time_pos
+
+        duration = self._mpv.duration
+        if isinstance(duration, float):
+            status_bar.duration = duration
 
 
 if __name__ == "__main__":

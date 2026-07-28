@@ -113,6 +113,7 @@ class SubsonicClient:
                 uid=e["id"],
                 artist=e["artist"],
                 title=e["title"],
+                album=e["album"],
                 duration=e["duration"],
                 genre=e.get("genre"),
             )

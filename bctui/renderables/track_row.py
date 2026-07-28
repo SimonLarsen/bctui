@@ -3,15 +3,7 @@ import math
 from rich.console import Console, ConsoleOptions, RenderResult
 from rich.text import Text
 
-
-def _duration_to_hhmmss(duration: float) -> str:
-    hours = int(duration // 3600)
-    minutes = int((duration % 3600) // 60)
-    seconds = int(duration % 60)
-    if hours > 0:
-        return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
-    else:
-        return f"{minutes:02d}:{seconds:02d}"
+from bctui.format import duration_to_hhmmss
 
 
 class TrackRow:
@@ -45,7 +37,7 @@ class TrackRow:
         t2 = Text(self._title)
         t2.truncate(track_width, overflow="ellipsis", pad=True)
 
-        t3 = Text(_duration_to_hhmmss(self._duration))
+        t3 = Text(duration_to_hhmmss(self._duration))
         t3.pad_left(duration_width - t3.cell_len)
 
         out = Text(" ").join((t1, t2, t3))

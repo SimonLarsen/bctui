@@ -26,7 +26,7 @@ class JKOptionList(OptionList):
 
 class AlbumList(JKOptionList):
     collection: reactive[list[CollectionEntry]] = reactive([])
-    playing: reactive[int | None] = reactive(None)
+    playing_uid: reactive[str | None] = reactive(None)
 
     @dataclass
     class AlbumSelected(Message):
@@ -38,7 +38,7 @@ class AlbumList(JKOptionList):
 
     def _make_row(self, index: int) -> AlbumRow:
         album = self.collection[index]
-        return AlbumRow(album.artist, album.title, index == self.playing)
+        return AlbumRow(album.artist, album.title, album.uid == self.playing_uid)
 
     def watch_collection(self, collection: list[CollectionEntry]) -> None:
         self.clear_options()
@@ -49,16 +49,10 @@ class AlbumList(JKOptionList):
         self.highlighted = 0
         self.focus()
 
-    def watch_playing(self, old_playing: int | None, new_playing: int | None) -> None:
-        if old_playing is not None:
-            self.replace_option_prompt_at_index(
-                old_playing, self._make_row(old_playing)
-            )
-
-        if new_playing is not None:
-            self.replace_option_prompt_at_index(
-                new_playing, self._make_row(new_playing)
-            )
+    def watch_playing_uid(self, old_uid: str | None, new_uid: str | None) -> None:
+        for i, album in enumerate(self.collection):
+            if album.uid == old_uid or album.uid == new_uid:
+                self.replace_option_prompt_at_index(i, self._make_row(i))
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
         index = event.option_index
@@ -69,7 +63,7 @@ class AlbumList(JKOptionList):
 class TrackList(JKOptionList):
     album_uid: str | None = None
     tracks: reactive[list[TrackData]] = reactive([])
-    playing: reactive[int | None] = reactive(None)
+    playing_uid: reactive[str | None] = reactive(None)
 
     @dataclass
     class TrackSelected(Message):
@@ -84,7 +78,11 @@ class TrackList(JKOptionList):
     def _make_row(self, index: int) -> TrackRow:
         track = self.tracks[index]
         return TrackRow(
-            index, len(self.tracks), track.title, track.duration, index == self.playing
+            index,
+            len(self.tracks),
+            track.title,
+            track.duration,
+            track.uid == self.playing_uid,
         )
 
     def watch_tracks(self, tracks: list[TrackData]) -> None:
@@ -95,16 +93,10 @@ class TrackList(JKOptionList):
 
         self.highlighted = 0
 
-    def watch_playing(self, old_playing: int | None, new_playing: int | None) -> None:
-        if old_playing is not None:
-            self.replace_option_prompt_at_index(
-                old_playing, self._make_row(old_playing)
-            )
-
-        if new_playing is not None:
-            self.replace_option_prompt_at_index(
-                new_playing, self._make_row(new_playing)
-            )
+    def watch_playing_uid(self, old_uid: str | None, new_uid: str | None) -> None:
+        for i, track in enumerate(self.tracks):
+            if track.uid == old_uid or track.uid == new_uid:
+                self.replace_option_prompt_at_index(i, self._make_row(i))
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
         if self.album_uid is None:
@@ -134,8 +126,6 @@ class BCTUIApp(App):
         Binding("U", "update_collection", "Update collection"),
     ]
 
-    playing_album_uid: str | None = None
-
     def __init__(self) -> None:
         super().__init__()
 
@@ -150,6 +140,8 @@ class BCTUIApp(App):
         )
 
         self._mpv.register_event_callback(self._handle_event)
+
+        self._playlist: list[TrackData] = []
 
     def _handle_event(self, event: mpv.MpvEvent) -> None:
         if event.event_id.value == mpv.MpvEventID.START_FILE:
@@ -172,21 +164,16 @@ class BCTUIApp(App):
         self._mpv.terminate()
 
     def _update_track_list_playing(self) -> None:
-        track_list = self.query_exactly_one(TrackList)
         pos = self._mpv.playlist_pos
-        if (
-            not isinstance(pos, int)
-            or pos == -1
-            or track_list.album_uid != self.playing_album_uid
-        ):
-            pos = None
-        track_list.playing = pos
+        if not isinstance(pos, int) or pos < 0:
+            return
+        track_list = self.query_exactly_one(TrackList)
+        track_list.playing_uid = self._playlist[pos].uid
 
     async def _update_track_list(self, message: AlbumList.AlbumSelected) -> None:
         album_data = await self._api.get_album(message.album.uid)
         track_list = self.query_exactly_one(TrackList)
         track_list.border_title = f"{message.album.artist} - {message.album.title}"
-        track_list.playing = None
         track_list.tracks = list(album_data.songs)
         track_list.album_uid = message.album.uid
         self._update_track_list_playing()
@@ -207,10 +194,8 @@ class BCTUIApp(App):
         self.playing_album_uid = message.album_uid
 
         album_list = self.query_exactly_one(AlbumList)
-        for i, album in enumerate(self._collection):
-            if album.uid == message.album_uid:
-                album_list.playing = i
-                break
+        album_list.playing_uid = message.album_uid
+        self._playlist = message.tracks
 
     def _set_playlist_pos(self, index: int) -> None:
         n = len(self._mpv.playlist_filenames)

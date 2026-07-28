@@ -6,6 +6,7 @@ dependencies = [
     "httpx>=0.28.1",
     "beautifulsoup4>=4.15.0",
     "mpv>=1.0.8",
+    "pyxdg>=0.28",
 ]
 requires-python = ">=3.10"
 authors = [

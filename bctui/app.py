@@ -210,8 +210,8 @@ class BCTUIApp(App):
         album_data = await self._api.get_album(message.album.uid)
         track_list = self.query_exactly_one(TrackList)
         track_list.border_title = f"{message.album.artist} - {message.album.title}"
-        track_list.tracks = list(album_data.songs)
         track_list.album_uid = message.album.uid
+        track_list.tracks = list(album_data.songs)
         self._update_track_list_playing()
 
     async def on_album_list_album_selected(

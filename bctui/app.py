@@ -3,31 +3,21 @@ from dataclasses import dataclass
 import mpv
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Grid, Horizontal
+from textual.containers import Horizontal
 from textual.message import Message
 from textual.reactive import reactive
 from textual.screen import ModalScreen
-from textual.widgets import Footer, Label, OptionList, ProgressBar, Static
+from textual.widgets import Footer, Label, OptionList, ProgressBar
 
 from bctui.cache import load_collection, save_collection
 from bctui.config import Config
-from bctui.format import duration_to_hhmmss
 from bctui.renderables import AlbumRow, TrackRow
 from bctui.subsonic import SubsonicClient
 from bctui.types import CollectionEntry, TrackData
+from bctui.widgets import StatusBar, VimOptionList
 
 
-class JKOptionList(OptionList):
-    BINDINGS = [
-        Binding(key="j", action="cursor_down"),
-        Binding(key="k", action="cursor_up"),
-        Binding(key="space", action="select"),
-        Binding(key="g", action="first"),
-        Binding(key="G", action="last"),
-    ]
-
-
-class AlbumList(JKOptionList):
+class AlbumList(VimOptionList):
     collection: reactive[list[CollectionEntry]] = reactive([])
     playing_uid: reactive[str | None] = reactive(None)
 
@@ -63,7 +53,7 @@ class AlbumList(JKOptionList):
         self.post_message(self.AlbumSelected(album))
 
 
-class TrackList(JKOptionList):
+class TrackList(VimOptionList):
     album_uid: str | None = None
     tracks: reactive[list[TrackData]] = reactive([])
     playing_uid: reactive[str | None] = reactive(None)
@@ -112,24 +102,6 @@ class TrackList(JKOptionList):
 class UpdateCollectionModal(ModalScreen):
     def compose(self) -> ComposeResult:
         yield Label("Updating collection...")
-
-
-class StatusBar(Grid):
-    title: reactive[str] = reactive("N/A", recompose=True)
-    artist: reactive[str] = reactive("N/A", recompose=True)
-    album: reactive[str] = reactive("N/A", recompose=True)
-    position: reactive[float] = reactive(0.0, recompose=True)
-    duration: reactive[float] = reactive(0.0, recompose=True)
-
-    def compose(self) -> ComposeResult:
-        yield Static(self.title, classes="statusbar--title")
-        yield Static(" by ", classes="statusbar--separator")
-        yield Static(self.artist, classes="statusbar--artist")
-        yield Static(" from ", classes="statusbar--separator")
-        yield Static(self.album, classes="statusbar--album")
-        t1 = duration_to_hhmmss(self.position)
-        t2 = duration_to_hhmmss(self.duration)
-        yield Static(f"[{t1}/{t2}]", classes="statusbar--time")
 
 
 class BCTUIApp(App):

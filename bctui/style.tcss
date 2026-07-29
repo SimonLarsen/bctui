@@ -11,11 +11,11 @@ AlbumList, TrackList {
 }
 
 AlbumList {
-    width: 0.33fr;
+    width: 0.5fr;
 }
 
 TrackList {
-    width: 0.67fr;
+    width: 0.5fr;
 }
 
 Footer {

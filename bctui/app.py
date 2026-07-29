@@ -232,8 +232,8 @@ class BCTUIApp(App):
         self._playlist = message.tracks
 
     def _set_playlist_pos(self, index: int) -> None:
-        n = len(self._mpv.playlist_filenames)
-        if n == 0:
+        n = self._mpv.playlist_count
+        if not isinstance(n, int) or n < 1:
             return
         self._mpv.playlist_pos = min(max(index, 0), n - 1)
         self._mpv.pause = False

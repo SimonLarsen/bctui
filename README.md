@@ -6,6 +6,8 @@ A simple text-based Bandcamp music player that allows you to stream your music c
 bctui is built on the new (in beta) [OpenSubsonic API](https://blog.bandcamp.com/2026/07/16/discover-improvements-and-subsonic-implementation/) and uses libmpv for streaming and playback.
 The TUI is implemented in Python using [Textual](https://textual.textualize.io).
 
+![screenshot](https://github.com/user-attachments/assets/9d4825fa-56ae-4a8a-bbfc-10017303f2d5)
+
 ## Installation
 
 First make sure `libmpv` is installed. On Debian-based systems you can install it with:
@@ -35,4 +37,4 @@ cat <<EOF> ~/.config/bctui/bctui.json
 EOF
 ```
 
-You can obtain your credentials under [Settings > Fan > Subsonic](https://bandcamp.com/settings?pane=fan).
+You can obtain your credentials under [Settings > Fan > Subsonic](https://bandcamp.com/settings?pane=fan#subsonic).

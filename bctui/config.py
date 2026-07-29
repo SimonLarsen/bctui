@@ -3,6 +3,8 @@ from dataclasses import dataclass
 
 import xdg.BaseDirectory
 
+DEFAULT_THEME = "catppuccin-mocha"
+
 
 class ConfigNotFoundError(Exception):
     pass
@@ -12,6 +14,7 @@ class ConfigNotFoundError(Exception):
 class Config:
     username: str
     password: str
+    theme: str
 
     @classmethod
     def load(cls) -> "Config":
@@ -25,4 +28,5 @@ class Config:
         return cls(
             username=js["username"],
             password=js["password"],
+            theme=js.get("theme", DEFAULT_THEME),
         )

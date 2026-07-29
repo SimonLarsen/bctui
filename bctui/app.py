@@ -142,8 +142,8 @@ class BCTUIApp(App):
         Binding("<", "prev", "Prev"),
         Binding(">", "next", "Next"),
         Binding("p", "pause", "Pause"),
-        Binding("h", "focus_collection", "Focus collection"),
-        Binding("l", "focus_track_list", "Focus tracks"),
+        Binding("h", "focus_collection", "Focus collection", show=False),
+        Binding("l", "focus_track_list", "Focus tracks", show=False),
         Binding("U", "update_collection", "Update collection"),
     ]
 

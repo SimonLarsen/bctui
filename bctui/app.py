@@ -1,13 +1,14 @@
 from dataclasses import dataclass
 
 import mpv
+from textual import events, work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal
+from textual.containers import Horizontal, Vertical
 from textual.message import Message
 from textual.reactive import reactive
 from textual.screen import ModalScreen
-from textual.widgets import Footer, Label, OptionList, ProgressBar
+from textual.widgets import Footer, Input, Label, OptionList, ProgressBar
 
 from bctui.cache import load_collection, save_collection
 from bctui.config import Config
@@ -18,6 +19,14 @@ from bctui.widgets import StatusBar, VimOptionList
 
 
 class AlbumList(VimOptionList):
+    DEFAULT_CSS = """
+    AlbumList {
+        width: 0.5fr;
+        height: 1fr;
+        border: round $foreground;
+        &:focus { border: round $primary; }
+    }
+    """
     collection: reactive[list[CollectionEntry]] = reactive([])
     playing_uid: reactive[str | None] = reactive(None)
 
@@ -54,6 +63,14 @@ class AlbumList(VimOptionList):
 
 
 class TrackList(VimOptionList):
+    DEFAULT_CSS = """
+    TrackList {
+        width: 0.5fr;
+        height: 1fr;
+        border: round $foreground;
+        &:focus { border: round $primary; }
+    }
+    """
     album_uid: str | None = None
     tracks: reactive[list[TrackData]] = reactive([])
     playing_uid: reactive[str | None] = reactive(None)
@@ -100,17 +117,115 @@ class TrackList(VimOptionList):
 
 
 class UpdateCollectionModal(ModalScreen):
+    DEFAULT_CSS = """
+    UpdateCollectionModal {
+        align: center middle;
+
+        Label {
+            border: round $foreground;
+            padding: 0 1;
+            content-align: center middle;
+        }
+    }
+    """
+
     def compose(self) -> ComposeResult:
         yield Label("Updating collection...")
+
+
+class SearchList(VimOptionList):
+    pass
+
+
+class SearchModal(ModalScreen):
+    DEFAULT_CSS = """
+    SearchModal {
+        align: center middle;
+
+        Vertical {
+            border: round $foreground;
+            width: 80%;
+            height: 80%;
+        }
+    }
+    """
+
+    def __init__(self, collection: list[CollectionEntry]):
+        super().__init__()
+        self._search_query: str = ""
+        self._matched_indices: list[int] = []
+        self._collection = collection
+
+    def _update_list(self) -> None:
+        options = []
+        matched_indices = []
+        for i, album in enumerate(self._collection):
+            key = f"{album.artist.lower()} {album.title.lower()}"
+            if self._search_query in key:
+                options.append(AlbumRow(album.artist, album.title))
+                matched_indices.append(i)
+
+        search_list = self.query_exactly_one(SearchList)
+        search_list.clear_options()
+        search_list.add_options(options)
+        self._matched_indices = matched_indices
+
+        if len(options) > 0 and search_list.highlighted is None:
+            search_list.highlighted = 0
+
+    def _confirm(self) -> None:
+        search_list = self.query_exactly_one(SearchList)
+        index = search_list.highlighted
+        if index is None:
+            self.dismiss(None)
+            return
+        album = self._collection[self._matched_indices[index]]
+        self.dismiss(album.uid)
+
+    def _move_cursor(self, delta: int) -> None:
+        search_list = self.query_exactly_one(SearchList)
+        index = search_list.highlighted
+        if index is None:
+            return
+        index += delta
+        search_list.highlighted = index
+
+    def compose(self) -> ComposeResult:
+        container = Vertical(
+            Input(compact=True),
+            SearchList(compact=True),
+        )
+        container.border_title = "Search"
+        yield container
+
+    def on_mount(self) -> None:
+        self._update_list()
+        self.query_exactly_one(Input).focus()
+
+    def on_input_changed(self, event: Input.Changed) -> None:
+        self._search_query = event.value
+        self._update_list()
+
+    def on_key(self, event: events.Key) -> None:
+        if event.key == "escape":
+            self.dismiss(None)
+        elif event.key == "enter":
+            self._confirm()
+            event.stop()
+        elif event.key == "ctrl+p":
+            self._move_cursor(-1)
+        elif event.key == "ctrl+n":
+            self._move_cursor(1)
 
 
 class BCTUIApp(App):
     CSS_PATH = "style.tcss"
 
+    ENABLE_COMMAND_PALETTE = False
     AUTO_FOCUS = None
 
     BINDINGS = [
-        Binding("F2", "search", "Search"),
+        Binding("f2", "search", "Search"),
         Binding("<", "prev", "Prev"),
         Binding(">", "next", "Next"),
         Binding("p", "pause", "Pause"),
@@ -211,6 +326,19 @@ class BCTUIApp(App):
             return
         self._mpv.playlist_pos = min(max(index, 0), n - 1)
         self._mpv.pause = False
+
+    @work
+    async def action_search(self) -> None:
+        uid = await self.push_screen_wait(SearchModal(self._collection))
+        if uid is None:
+            return
+
+        album_list = self.query_exactly_one(AlbumList)
+        for i, album in enumerate(self._collection):
+            if album.uid == uid:
+                album_list.highlighted = i
+                album_list.action_select()
+                return
 
     def action_prev(self) -> None:
         pos = self._mpv.playlist_pos

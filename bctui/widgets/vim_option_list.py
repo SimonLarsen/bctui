@@ -3,6 +3,14 @@ from textual.widgets import OptionList
 
 
 class VimOptionList(OptionList):
+    DEFAULT_CSS = """
+    VimOptionList {
+        background: $background;
+        background-tint: $background;
+        scrollbar-size: 1 1;
+    }
+    """
+
     BINDINGS = [
         Binding(key="j", action="cursor_down"),
         Binding(key="k", action="cursor_up"),

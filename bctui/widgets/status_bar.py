@@ -7,6 +7,26 @@ from bctui.format import duration_to_hhmmss
 
 
 class StatusBar(Horizontal):
+    DEFAULT_CSS = """
+    StatusBar {
+        height: 1;
+    }
+
+    .statusbar--info {
+        width: auto;
+        color: $accent;
+    }
+
+    .statusbar--separator {
+        width: auto;
+    }
+
+    .statusbar--time {
+        width: 1fr;
+        text-align: right;
+    }
+    """
+
     title: reactive[str | None] = reactive(None, recompose=True)
     artist: reactive[str | None] = reactive(None, recompose=True)
     album: reactive[str | None] = reactive(None, recompose=True)

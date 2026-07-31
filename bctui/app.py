@@ -121,20 +121,31 @@ class UpdateCollectionModal(ModalScreen):
     UpdateCollectionModal {
         align: center middle;
 
-        Label {
+        Vertical {
             border: round $foreground;
-            padding: 0 1;
-            content-align: center middle;
+            width: 30;
+            height: 4;
+            padding: 0 1 0 1;
+
+            Label {
+                text-align: center;
+            }
         }
     }
     """
 
+    def __init__(self, api: SubsonicClient):
+        super().__init__()
+        self._api = api
+
     def compose(self) -> ComposeResult:
-        yield Label("Updating collection...")
+        with Vertical():
+            yield Label("Updating collection...", expand=True)
+            yield ProgressBar(show_bar=True, show_percentage=False, show_eta=False)
 
-
-class SearchList(VimOptionList):
-    pass
+    async def on_show(self) -> None:
+        collection = await self._api.get_collection()
+        self.dismiss(collection)
 
 
 class SearchModal(ModalScreen):
@@ -156,6 +167,18 @@ class SearchModal(ModalScreen):
         self._matched_indices: list[int] = []
         self._collection = collection
 
+    def compose(self) -> ComposeResult:
+        container = Vertical(
+            Input(compact=True),
+            VimOptionList(compact=True),
+        )
+        container.border_title = "Search"
+        yield container
+
+    def on_mount(self) -> None:
+        self._update_list()
+        self.query_exactly_one(Input).focus()
+
     def _update_list(self) -> None:
         options = []
         matched_indices = []
@@ -165,7 +188,7 @@ class SearchModal(ModalScreen):
                 options.append(AlbumRow(album.artist, album.title))
                 matched_indices.append(i)
 
-        search_list = self.query_exactly_one(SearchList)
+        search_list = self.query_exactly_one(VimOptionList)
         search_list.clear_options()
         search_list.add_options(options)
         self._matched_indices = matched_indices
@@ -174,7 +197,7 @@ class SearchModal(ModalScreen):
             search_list.highlighted = 0
 
     def _confirm(self) -> None:
-        search_list = self.query_exactly_one(SearchList)
+        search_list = self.query_exactly_one(VimOptionList)
         index = search_list.highlighted
         if index is None:
             self.dismiss(None)
@@ -183,24 +206,12 @@ class SearchModal(ModalScreen):
         self.dismiss(album.uid)
 
     def _move_cursor(self, delta: int) -> None:
-        search_list = self.query_exactly_one(SearchList)
+        search_list = self.query_exactly_one(VimOptionList)
         index = search_list.highlighted
         if index is None:
             return
         index += delta
         search_list.highlighted = index
-
-    def compose(self) -> ComposeResult:
-        container = Vertical(
-            Input(compact=True),
-            SearchList(compact=True),
-        )
-        container.border_title = "Search"
-        yield container
-
-    def on_mount(self) -> None:
-        self._update_list()
-        self.query_exactly_one(Input).focus()
 
     def on_input_changed(self, event: Input.Changed) -> None:
         self._search_query = event.value
@@ -361,13 +372,10 @@ class BCTUIApp(App):
     def action_focus_track_list(self) -> None:
         self.query_exactly_one(TrackList).focus()
 
+    @work
     async def action_update_collection(self) -> None:
-        self.push_screen(UpdateCollectionModal())
-
-        self._collection = await self._api.get_collection()
+        self._collection = await self.push_screen_wait(UpdateCollectionModal(self._api))
         save_collection(self._collection)
-
-        self.pop_screen()
 
         album_list = self.query_exactly_one(AlbumList)
         album_list.collection = self._collection

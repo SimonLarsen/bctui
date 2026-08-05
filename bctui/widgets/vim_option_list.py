@@ -17,4 +17,6 @@ class VimOptionList(OptionList):
         Binding(key="space", action="select"),
         Binding(key="g", action="first"),
         Binding(key="G", action="last"),
+        Binding(key="ctrl+f", action="page_down"),
+        Binding(key="ctrl+b", action="page_up"),
     ]

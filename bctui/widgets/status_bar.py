@@ -14,7 +14,7 @@ class StatusBar(Horizontal):
 
     .statusbar--info {
         width: auto;
-        color: $accent;
+        color: $primary;
     }
 
     .statusbar--separator {

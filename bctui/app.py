@@ -143,9 +143,13 @@ class UpdateCollectionModal(ModalScreen):
             yield Label("Updating collection...", expand=True)
             yield ProgressBar(show_bar=True, show_percentage=False, show_eta=False)
 
-    async def on_show(self) -> None:
+    @work
+    async def _fetch_collection(self) -> None:
         collection = await self._api.get_collection()
         self.dismiss(collection)
+
+    async def on_show(self) -> None:
+        self._fetch_collection()
 
 
 class SearchModal(ModalScreen):

@@ -27,6 +27,9 @@ requires = ["setuptools>=82.0.1"]
 [tool.setuptools.dynamic]
 version = {attr = "bctui.__version__"}
 
+[tool.setuptools.package-data]
+bctui = ["*.tcss"]
+
 [tool.basedpyright]
 typeCheckingMode = "standard"
 

@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=82.0.1"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "bctui"
 description = "A simple text-based Bandcamp music player"
@@ -17,12 +21,16 @@ maintainers = [
 ]
 readme = {file = "README.md", content-type = "text/markdown"}
 license = "MIT"
+license-files = ["LICENSE"]
+keywords = ["bandcamp", "music", "subsonic"]
+
+[project.urls]
+Homepage = "https://github.com/SimonLarsen/bctui"
+Repository = "https://github.com/SimonLarsen/bctui"
+"Bug Tracker" = "https://github.com/SimonLarsen/bctui/issues"
 
 [project.scripts]
 bctui = "bctui.__main__:main"
-
-[build-system]
-requires = ["setuptools>=82.0.1"]
 
 [tool.setuptools.dynamic]
 version = {attr = "bctui.__version__"}

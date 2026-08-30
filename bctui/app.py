@@ -314,7 +314,6 @@ class BCTUIApp(App):
         track_list.border_title = f"{message.album.artist} - {message.album.title}"
         track_list.album_uid = message.album.uid
         track_list.tracks = list(album_data.songs)
-        self._update_track_list_playing()
 
     async def on_album_list_album_selected(
         self, message: AlbumList.AlbumSelected

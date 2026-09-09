@@ -25,6 +25,8 @@ uv run bctui
 
 ## Configuration
 
+### Setting bandcamp credentials
+
 Create a new configuration file in `$XDG_CONFIG_HOME/bctui/bctui.json` and add your Bandcamp Subsonic username and password:
 
 ```sh
@@ -38,3 +40,14 @@ EOF
 ```
 
 You can obtain your credentials under [Settings > Fan > Subsonic](https://bandcamp.com/settings?pane=fan#subsonic).
+
+### Themes
+
+You can change the default application theme by setting `theme` to a valid [Textual theme](https://textual.textualize.io/guide/design) name:
+
+```sh
+{
+    ...
+    "theme": "catppuccin-mocha"
+}
+```

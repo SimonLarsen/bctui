@@ -52,5 +52,6 @@ skip-magic-trailing-comma = false
 
 [dependency-groups]
 dev = [
+    "ruff>=0.16.6",
     "textual-dev>=1.8.0",
 ]

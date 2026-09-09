@@ -283,7 +283,8 @@ class BCTUIApp(App):
         yield Footer(compact=True)
 
     def on_mount(self) -> None:
-        self.theme = self._config.theme
+        if self._config.theme is not None:
+            self.theme = self._config.theme
 
         self.progress_timer = self.set_interval(1.0, self.update_progress)
 

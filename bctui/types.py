@@ -23,4 +23,6 @@ class TrackData:
 
 @dataclass
 class AlbumData:
-    songs: Sequence[TrackData]
+    uid: str
+    tracks: Sequence[TrackData]
+    various_artist: bool = False

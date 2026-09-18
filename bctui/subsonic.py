@@ -107,9 +107,10 @@ class SubsonicClient:
         data = await self._get("/rest/getAlbum", id=uid)
         info = data["subsonic-response"]["album"]
 
-        songs: list[TrackData] = []
+        all_artists = set()
+        tracks: list[TrackData] = []
         for e in info["song"]:
-            song = TrackData(
+            track = TrackData(
                 uid=e["id"],
                 artist=e["artist"],
                 title=e["title"],
@@ -117,9 +118,14 @@ class SubsonicClient:
                 duration=e["duration"],
                 genre=e.get("genre"),
             )
-            songs.append(song)
+            tracks.append(track)
+            all_artists.add(track.artist)
 
-        return AlbumData(songs=songs)
+        return AlbumData(
+            uid=uid,
+            tracks=tracks,
+            various_artist=len(all_artists) > 1,
+        )
 
     def get_stream_url(self, uid: str) -> httpx.URL:
         params = self._get_base_params()

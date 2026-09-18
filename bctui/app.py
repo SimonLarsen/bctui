@@ -14,7 +14,7 @@ from bctui.cache import load_collection, save_collection
 from bctui.config import Config
 from bctui.renderables import AlbumRow, TrackRow
 from bctui.subsonic import SubsonicClient
-from bctui.types import CollectionEntry, TrackData
+from bctui.types import AlbumData, CollectionEntry, TrackData
 from bctui.widgets import StatusBar, VimOptionList
 
 
@@ -71,14 +71,12 @@ class TrackList(VimOptionList):
         &:focus { border: round $primary; }
     }
     """
-    album_uid: str | None = None
-    tracks: reactive[list[TrackData]] = reactive([])
+    album_data: reactive[AlbumData] = reactive(AlbumData("", []))
     playing_uid: reactive[str | None] = reactive(None)
 
     @dataclass
     class TrackSelected(Message):
-        album_uid: str
-        tracks: list[TrackData]
+        album_data: AlbumData
         index: int
 
     def __init__(self):
@@ -86,34 +84,32 @@ class TrackList(VimOptionList):
         self.border_title = "N/A - N/A"
 
     def _make_row(self, index: int) -> TrackRow:
-        track = self.tracks[index]
+        track = self.album_data.tracks[index]
         return TrackRow(
             index,
-            len(self.tracks),
+            len(self.album_data.tracks),
             track.title,
+            track.artist,
             track.duration,
             track.uid == self.playing_uid,
+            self.album_data.various_artist,
         )
 
-    def watch_tracks(self, tracks: list[TrackData]) -> None:
+    def watch_album_data(self, album_data: AlbumData) -> None:
         self.clear_options()
 
-        for i in range(len(self.tracks)):
+        for i in range(len(self.album_data.tracks)):
             self.add_option(self._make_row(i))
 
         self.highlighted = 0
 
     def watch_playing_uid(self, old_uid: str | None, new_uid: str | None) -> None:
-        for i, track in enumerate(self.tracks):
+        for i, track in enumerate(self.album_data.tracks):
             if track.uid == old_uid or track.uid == new_uid:
                 self.replace_option_prompt_at_index(i, self._make_row(i))
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
-        if self.album_uid is None:
-            return
-        self.post_message(
-            self.TrackSelected(self.album_uid, self.tracks, event.option_index)
-        )
+        self.post_message(self.TrackSelected(self.album_data, event.option_index))
 
 
 class UpdateCollectionModal(ModalScreen):
@@ -313,8 +309,7 @@ class BCTUIApp(App):
         album_data = await self._api.get_album(message.album.uid)
         track_list = self.query_exactly_one(TrackList)
         track_list.border_title = f"{message.album.artist} - {message.album.title}"
-        track_list.album_uid = message.album.uid
-        track_list.tracks = list(album_data.songs)
+        track_list.album_data = album_data
 
     async def on_album_list_album_selected(
         self, message: AlbumList.AlbumSelected
@@ -325,15 +320,15 @@ class BCTUIApp(App):
     def on_track_list_track_selected(self, message: TrackList.TrackSelected) -> None:
         self._mpv.stop(keep_playlist=False)
         self._mpv.playlist_clear()
-        for track in message.tracks:
+        for track in message.album_data.tracks:
             url = self._api.get_stream_url(track.uid)
             self._mpv.playlist_append(str(url))
         self._set_playlist_pos(message.index)
-        self.playing_album_uid = message.album_uid
+        self.playing_album_uid = message.album_data.uid
 
         album_list = self.query_exactly_one(AlbumList)
-        album_list.playing_uid = message.album_uid
-        self._playlist = message.tracks
+        album_list.playing_uid = message.album_data.uid
+        self._playlist = list(message.album_data.tracks)
 
     def _set_playlist_pos(self, index: int) -> None:
         n = self._mpv.playlist_count

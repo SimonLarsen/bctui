@@ -109,6 +109,7 @@ class TrackList(VimOptionList):
                 self.replace_option_prompt_at_index(i, self._make_row(i))
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
+        self.playing_uid = self.album_data.tracks[event.option_index].uid
         self.post_message(self.TrackSelected(self.album_data, event.option_index))
 
 

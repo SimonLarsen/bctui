@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from enum import Enum
 
 import mpv
 from textual import events, work
@@ -18,6 +19,12 @@ from bctui.types import AlbumData, CollectionEntry, TrackData
 from bctui.widgets import StatusBar, VimOptionList
 
 
+class Sorting(Enum):
+    PURCHASED = 0
+    ARTIST = 1
+    TITLE = 2
+
+
 class AlbumList(VimOptionList):
     DEFAULT_CSS = """
     AlbumList {
@@ -28,6 +35,8 @@ class AlbumList(VimOptionList):
     }
     """
     collection: reactive[list[CollectionEntry]] = reactive([])
+    sorted_collection: list[CollectionEntry]
+    sorting: reactive[Sorting] = reactive(Sorting.PURCHASED)
     playing_uid: reactive[str | None] = reactive(None)
 
     @dataclass
@@ -37,28 +46,49 @@ class AlbumList(VimOptionList):
     def __init__(self):
         super().__init__()
         self.border_title = "Collection"
+        self.sorted_collection = []
 
     def _make_row(self, index: int) -> AlbumRow:
-        album = self.collection[index]
+        album = self.sorted_collection[index]
         return AlbumRow(album.artist, album.title, album.uid == self.playing_uid)
 
-    def watch_collection(self, collection: list[CollectionEntry]) -> None:
-        self.clear_options()
+    def _update_list(self) -> None:
+        old_highlighted_uid = None
+        if self.highlighted is not None:
+            old_highlighted_uid = self.sorted_collection[self.highlighted].uid
 
-        for i in range(len(self.collection)):
+        self.sorted_collection = self.collection.copy()
+        if self.sorting == Sorting.ARTIST:
+            self.sorted_collection.sort(key=lambda a: a.artist)
+        elif self.sorting == Sorting.TITLE:
+            self.sorted_collection.sort(key=lambda a: a.title)
+
+        self.clear_options()
+        for i in range(len(self.sorted_collection)):
             self.add_option(self._make_row(i))
 
+        if old_highlighted_uid is not None:
+            for i, album in enumerate(self.sorted_collection):
+                if album.uid == old_highlighted_uid:
+                    self.highlighted = i
+
+    def watch_collection(self, collection: list[CollectionEntry]) -> None:
+        self._update_list()
         self.highlighted = 0
         self.focus()
 
+    def watch_sorting(self, sorting: Sorting) -> None:
+        self.border_subtitle = "Sort by: " + self.sorting.name.title()
+        self._update_list()
+
     def watch_playing_uid(self, old_uid: str | None, new_uid: str | None) -> None:
-        for i, album in enumerate(self.collection):
+        for i, album in enumerate(self.sorted_collection):
             if album.uid == old_uid or album.uid == new_uid:
                 self.replace_option_prompt_at_index(i, self._make_row(i))
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
         index = event.option_index
-        album = self.collection[index]
+        album = self.sorted_collection[index]
         self.post_message(self.AlbumSelected(album))
 
 
@@ -238,6 +268,7 @@ class BCTUIApp(App):
 
     BINDINGS = [
         Binding("f2", "search", "Search"),
+        Binding("f3", "sort", "Sort"),
         Binding("<", "prev", "Prev"),
         Binding(">", "next", "Next"),
         Binding("p", "pause", "Pause"),
@@ -379,6 +410,10 @@ class BCTUIApp(App):
 
         album_list = self.query_exactly_one(AlbumList)
         album_list.collection = self._collection
+
+    def action_sort(self) -> None:
+        album_list = self.query_exactly_one(AlbumList)
+        album_list.sorting = Sorting((album_list.sorting.value + 1) % len(Sorting))
 
     def update_progress(self) -> None:
         percent_pos = self._mpv.percent_pos

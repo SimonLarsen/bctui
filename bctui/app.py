@@ -86,6 +86,14 @@ class AlbumList(VimOptionList):
             if album.uid == old_uid or album.uid == new_uid:
                 self.replace_option_prompt_at_index(i, self._make_row(i))
 
+    def highlight_playing(self) -> None:
+        if self.playing_uid is None:
+            return
+
+        for i, album in enumerate(self.sorted_collection):
+            if album.uid == self.playing_uid:
+                self.highlighted = i
+
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
         index = event.option_index
         album = self.sorted_collection[index]
@@ -272,9 +280,10 @@ class BCTUIApp(App):
         Binding("<", "prev", "Prev"),
         Binding(">", "next", "Next"),
         Binding("p", "pause", "Pause"),
+        Binding("c", "highlight_current", "Highlight current album"),
+        Binding("U", "update_collection", "Update collection"),
         Binding("h,left", "focus_collection", "Focus collection", show=False),
         Binding("l,right", "focus_track_list", "Focus tracks", show=False),
-        Binding("U", "update_collection", "Update collection"),
     ]
 
     def __init__(self) -> None:
@@ -382,6 +391,10 @@ class BCTUIApp(App):
                 album_list.action_select()
                 return
 
+    def action_sort(self) -> None:
+        album_list = self.query_exactly_one(AlbumList)
+        album_list.sorting = Sorting((album_list.sorting.value + 1) % len(Sorting))
+
     def action_prev(self) -> None:
         pos = self._mpv.playlist_pos
         if not isinstance(pos, int) or pos == -1:
@@ -397,11 +410,8 @@ class BCTUIApp(App):
     def action_pause(self) -> None:
         self._mpv.pause = not self._mpv.pause
 
-    def action_focus_collection(self) -> None:
-        self.query_exactly_one(AlbumList).focus()
-
-    def action_focus_track_list(self) -> None:
-        self.query_exactly_one(TrackList).focus()
+    def action_highlight_current(self) -> None:
+        self.query_exactly_one(AlbumList).highlight_playing()
 
     @work
     async def action_update_collection(self) -> None:
@@ -411,9 +421,11 @@ class BCTUIApp(App):
         album_list = self.query_exactly_one(AlbumList)
         album_list.collection = self._collection
 
-    def action_sort(self) -> None:
-        album_list = self.query_exactly_one(AlbumList)
-        album_list.sorting = Sorting((album_list.sorting.value + 1) % len(Sorting))
+    def action_focus_collection(self) -> None:
+        self.query_exactly_one(AlbumList).focus()
+
+    def action_focus_track_list(self) -> None:
+        self.query_exactly_one(TrackList).focus()
 
     def update_progress(self) -> None:
         percent_pos = self._mpv.percent_pos

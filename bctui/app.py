@@ -271,7 +271,7 @@ class SearchModal(ModalScreen):
 class BCTUIApp(App):
     CSS_PATH = "style.tcss"
 
-    ENABLE_COMMAND_PALETTE = False
+    ENABLE_COMMAND_PALETTE = True
     AUTO_FOCUS = None
 
     BINDINGS = [

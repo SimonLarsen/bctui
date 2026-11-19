@@ -359,9 +359,6 @@ class BCTUIApp(App):
         self.query_exactly_one(TrackList).focus()
 
     def on_track_list_track_selected(self, message: TrackList.TrackSelected) -> None:
-        album_list = self.query_exactly_one(AlbumList)
-        album_list.playing_uid = message.album_data.uid
-
         self._mpv.stop(keep_playlist=False)
         self._mpv.playlist_clear()
         for track in message.album_data.tracks:
@@ -370,6 +367,11 @@ class BCTUIApp(App):
         self._set_playlist_pos(message.index)
         self.playing_album_uid = message.album_data.uid
         self._playlist = list(message.album_data.tracks)
+
+        album_list = self.query_exactly_one(AlbumList)
+        album_list.playing_uid = message.album_data.uid
+
+        self._update_track_list_playing()
 
     def _set_playlist_pos(self, index: int) -> None:
         n = self._mpv.playlist_count

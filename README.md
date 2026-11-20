@@ -6,7 +6,7 @@ A simple text-based Bandcamp music player that allows you to stream your music c
 bctui is built on the new (in beta) [OpenSubsonic API](https://blog.bandcamp.com/2026/07/16/discover-improvements-and-subsonic-implementation/) and uses libmpv for streaming and playback.
 The TUI is implemented in Python using [Textual](https://textual.textualize.io).
 
-![screenshot](https://github.com/user-attachments/assets/c60ea7ec-4094-4ec9-bbb2-395f0ca378b2)
+![screenshot](https://github.com/user-attachments/assets/108137f4-68da-4545-959e-d78d422272bf)
 
 ## Installation
 

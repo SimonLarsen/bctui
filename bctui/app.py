@@ -271,7 +271,7 @@ class SearchModal(ModalScreen):
 class BCTUIApp(App):
     CSS_PATH = "style.tcss"
 
-    ENABLE_COMMAND_PALETTE = True
+    ENABLE_COMMAND_PALETTE = False
     AUTO_FOCUS = None
 
     BINDINGS = [
@@ -387,7 +387,7 @@ class BCTUIApp(App):
             return
 
         album_list = self.query_exactly_one(AlbumList)
-        for i, album in enumerate(self._collection):
+        for i, album in enumerate(album_list.sorted_collection):
             if album.uid == uid:
                 album_list.highlighted = i
                 album_list.action_select()
